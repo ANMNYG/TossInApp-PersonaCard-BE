@@ -1,7 +1,7 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/generate-card.ts": {
-      "runtime": "@vercel/node@3",
       "maxDuration": 60
     }
   }

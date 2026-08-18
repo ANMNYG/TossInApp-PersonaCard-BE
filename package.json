@@ -5,7 +5,6 @@
   "description": "AI Persona Card generation backend (Vercel Serverless Functions)",
   "scripts": {
     "dev": "vercel dev",
-    "build": "tsc --noEmit",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {},
