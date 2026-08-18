@@ -15,7 +15,7 @@ const VALID_ELEMENTS: Element[] = ["fire", "water", "earth", "air"];
 // 예: process.env.ALLOWED_ORIGIN = "https://apps-in-toss.example.com"
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN ?? "*";
 
-const GEMINI_MODEL = "gemini-2.5-flash-image";
+const GEMINI_MODEL = "gemini-3.1-flash-image";
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const GEMINI_TIMEOUT_MS = 45_000;
 
