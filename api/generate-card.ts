@@ -15,9 +15,8 @@ const VALID_ELEMENTS: Element[] = ["fire", "water", "earth", "air"];
 // 예: process.env.ALLOWED_ORIGIN = "https://apps-in-toss.example.com"
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN ?? "*";
 
-const GEMINI_MODEL = "gemini-3.1-flash-image";
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-const GEMINI_TIMEOUT_MS = 45_000;
+const POLLINATIONS_IMAGE_URL = "https://image.pollinations.ai/prompt";
+const POLLINATIONS_TIMEOUT_MS = 45_000;
 
 const ELEMENT_STYLE: Record<Element, string> = {
   fire: "blazing fire element, embers, flame aura, molten energy",
@@ -81,47 +80,35 @@ function setCorsHeaders(res: VercelResponse): void {
   res.setHeader("Access-Control-Max-Age", "86400");
 }
 
-interface GeminiInlineData {
+interface PollinationsImage {
   mimeType: string;
-  data: string;
+  base64: string;
 }
 
-interface GeminiPart {
-  inlineData?: GeminiInlineData;
-  text?: string;
+class PollinationsApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "PollinationsApiError";
+    this.status = status;
+  }
 }
 
-interface GeminiResponse {
-  candidates?: Array<{
-    content?: {
-      parts?: GeminiPart[];
-    };
-    finishReason?: string;
-  }>;
-  promptFeedback?: {
-    blockReason?: string;
-  };
-}
-
-async function callGeminiImageApi(prompt: string, apiKey: string): Promise<GeminiInlineData> {
+async function callPollinationsImageApi(prompt: string): Promise<PollinationsImage> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), POLLINATIONS_TIMEOUT_MS);
+
+  // nologo=true: Pollinations 자체 워터마크 제거 (카드 프롬프트의 "no watermark" 의도와 일치)
+  const url = `${POLLINATIONS_IMAGE_URL}/${encodeURIComponent(prompt)}?nologo=true`;
 
   let response: Response;
   try {
-    response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-      }),
-      signal: controller.signal,
-    });
+    response = await fetch(url, { signal: controller.signal });
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
-      throw new GeminiApiError("Gemini API 호출이 시간 초과되었습니다.", 504);
+      throw new PollinationsApiError("Pollinations API 호출이 시간 초과되었습니다.", 504);
     }
-    throw new GeminiApiError("Gemini API 호출 중 네트워크 오류가 발생했습니다.", 502);
+    throw new PollinationsApiError("Pollinations API 호출 중 네트워크 오류가 발생했습니다.", 502);
   } finally {
     clearTimeout(timeout);
   }
@@ -129,43 +116,29 @@ async function callGeminiImageApi(prompt: string, apiKey: string): Promise<Gemin
   if (!response.ok) {
     let detail = "";
     try {
-      const errBody = (await response.json()) as { error?: { message?: string } };
-      detail = errBody?.error?.message ?? "";
+      detail = (await response.text()).slice(0, 200);
     } catch {
-      // 응답 본문이 JSON이 아닌 경우 무시
+      // 응답 본문을 읽을 수 없는 경우 무시
     }
-    throw new GeminiApiError(
-      `Gemini API 호출에 실패했습니다 (status: ${response.status}).${detail ? ` ${detail}` : ""}`,
-      response.status === 401 || response.status === 403 ? 502 : response.status
+    throw new PollinationsApiError(
+      `Pollinations API 호출에 실패했습니다 (status: ${response.status}).${detail ? ` ${detail}` : ""}`,
+      502
     );
   }
 
-  const data = (await response.json()) as GeminiResponse;
-
-  if (data.promptFeedback?.blockReason) {
-    throw new GeminiApiError(
-      `요청이 안전 정책에 의해 차단되었습니다: ${data.promptFeedback.blockReason}`,
-      422
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.startsWith("image/")) {
+    throw new PollinationsApiError(
+      `Pollinations API가 이미지가 아닌 응답을 반환했습니다 (content-type: ${contentType || "unknown"}).`,
+      502
     );
   }
 
-  const parts = data.candidates?.[0]?.content?.parts ?? [];
-  const imagePart = parts.find((part) => part.inlineData?.data);
-
-  if (!imagePart?.inlineData) {
-    throw new GeminiApiError("Gemini API 응답에서 이미지를 찾을 수 없습니다.", 502);
-  }
-
-  return imagePart.inlineData;
-}
-
-class GeminiApiError extends Error {
-  status: number;
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = "GeminiApiError";
-    this.status = status;
-  }
+  const arrayBuffer = await response.arrayBuffer();
+  return {
+    mimeType: contentType,
+    base64: Buffer.from(arrayBuffer).toString("base64"),
+  };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -181,12 +154,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    res.status(500).json({ error: "서버에 GEMINI_API_KEY가 설정되어 있지 않습니다." });
-    return;
-  }
-
   const validation = validateBody(req.body);
   if (!validation.ok) {
     res.status(400).json({ error: validation.error });
@@ -196,16 +163,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const prompt = buildPrompt(validation.data);
 
   try {
-    const inlineData = await callGeminiImageApi(prompt, apiKey);
-    res.status(200).json({
-      image: {
-        mimeType: inlineData.mimeType,
-        base64: inlineData.data,
-      },
-      prompt,
-    });
+    const image = await callPollinationsImageApi(prompt);
+    res.status(200).json({ image, prompt });
   } catch (err) {
-    if (err instanceof GeminiApiError) {
+    if (err instanceof PollinationsApiError) {
       res.status(err.status).json({ error: err.message });
       return;
     }

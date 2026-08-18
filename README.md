@@ -1,6 +1,6 @@
 # AI Persona Card Backend
 
-`ai-persona-card` 프론트엔드(앱인토스 미니앱)를 위한 AI 페르소나 카드 이미지 생성 백엔드입니다. 사용자가 선택한 원소(element), 페르소나 타이틀, 색상 정보를 받아 Google Gemini 이미지 생성 API로 판타지 스타일의 트레이딩 카드 일러스트를 만들어 반환합니다.
+`ai-persona-card` 프론트엔드(앱인토스 미니앱)를 위한 AI 페르소나 카드 이미지 생성 백엔드입니다. 사용자가 선택한 원소(element), 페르소나 타이틀, 색상 정보를 받아 [Pollinations.ai](https://pollinations.ai/) 무료 이미지 생성 API로 판타지 스타일의 트레이딩 카드 일러스트를 만들어 반환합니다.
 
 ## 주요 기능
 
@@ -39,7 +39,7 @@
 ```
 
 - `image.base64`: 생성된 이미지의 base64 인코딩 데이터
-- `prompt`: Gemini에 실제로 전달된 프롬프트 (디버깅/확인용)
+- `prompt`: Pollinations에 실제로 전달된 프롬프트 (디버깅/확인용)
 
 **에러 응답**
 
@@ -47,10 +47,9 @@
 | --- | --- |
 | 400 | 요청 바디 검증 실패 (`element`, `personaTitle`, `colorPrimary`, `colorSecondary` 누락/형식 오류) |
 | 405 | POST/OPTIONS 이외의 메서드 |
-| 422 | Gemini 안전 정책에 의해 콘텐츠가 차단됨 |
-| 500 | `GEMINI_API_KEY` 미설정 등 서버 내부 오류 |
-| 502 | Gemini API 호출 실패 (네트워크 오류, 인증 실패 등) |
-| 504 | Gemini API 호출 타임아웃 (45초) |
+| 500 | 서버 내부 오류 (예상치 못한 예외) |
+| 502 | Pollinations API 호출 실패 (네트워크 오류, 실패 응답, 이미지가 아닌 응답 등) |
+| 504 | Pollinations API 호출 타임아웃 (45초) |
 
 에러 응답 형식은 공통으로 `{ "error": string }` 입니다.
 
@@ -60,14 +59,14 @@ CORS: `OPTIONS` 프리플라이트를 지원하며, `Access-Control-Allow-Origin
 
 - [Vercel Serverless Functions](https://vercel.com/docs/functions) (`@vercel/node`)
 - TypeScript
-- [Google Gemini 이미지 생성 API](https://ai.google.dev/) (`gemini-2.5-flash-image`)
+- [Pollinations.ai 이미지 생성 API](https://pollinations.ai/) (API 키 불필요, `https://image.pollinations.ai/prompt/{인코딩된 프롬프트}`)
 
 ## 프로젝트 구조
 
 ```
 .
 ├── api/
-│   └── generate-card.ts     # 카드 이미지 생성 API 핸들러 (요청 검증, 프롬프트 구성, Gemini 호출)
+│   └── generate-card.ts     # 카드 이미지 생성 API 핸들러 (요청 검증, 프롬프트 구성, Pollinations 호출)
 ├── .env.local.example       # 로컬 개발용 환경변수 예시
 ├── .gitignore
 ├── package.json
@@ -84,7 +83,7 @@ CORS: `OPTIONS` 프리플라이트를 지원하며, `Access-Control-Allow-Origin
    npm install
    ```
 
-2. 환경변수 설정: `.env.local.example`을 복사해 `.env.local`을 만들고 값을 채웁니다.
+2. 환경변수 설정: `.env.local.example`을 복사해 `.env.local`을 만들고 값을 채웁니다. (Pollinations API는 별도 키가 필요 없습니다.)
 
    ```bash
    cp .env.local.example .env.local
@@ -92,7 +91,6 @@ CORS: `OPTIONS` 프리플라이트를 지원하며, `Access-Control-Allow-Origin
 
    | 변수 | 설명 |
    | --- | --- |
-   | `GEMINI_API_KEY` | [Google AI Studio](https://ai.google.dev/)에서 발급받은 Gemini API 키 |
    | `ALLOWED_ORIGIN` | CORS 허용 origin. 로컬 개발 시 `*` 사용 가능 |
 
 3. 개발 서버 실행
@@ -120,14 +118,13 @@ CORS: `OPTIONS` 프리플라이트를 지원하며, `Access-Control-Allow-Origin
 
 2. Vercel 프로젝트 설정 → **Environment Variables**에서 아래 값을 등록합니다.
 
-   - `GEMINI_API_KEY`
    - `ALLOWED_ORIGIN` (프로덕션 프론트엔드의 실제 origin으로 설정)
 
 3. GitHub 연동 시 `main` 브랜치에 머지되면 Vercel이 자동으로 프로덕션 배포를 수행합니다.
 
 ## 프론트엔드(ai-persona-card)와의 관계
 
-이 저장소는 `ai-persona-card` 프론트엔드(앱인토스 미니앱)의 백엔드 API 서버입니다. 프론트엔드에서 사용자가 선택한 원소/타이틀/색상 정보를 이 백엔드의 `/api/generate-card`로 전송하면, 이 백엔드가 Gemini API를 호출해 이미지를 생성하고 base64로 인코딩된 이미지를 반환합니다. 프론트엔드는 이를 받아 카드 UI에 렌더링합니다.
+이 저장소는 `ai-persona-card` 프론트엔드(앱인토스 미니앱)의 백엔드 API 서버입니다. 프론트엔드에서 사용자가 선택한 원소/타이틀/색상 정보를 이 백엔드의 `/api/generate-card`로 전송하면, 이 백엔드가 Pollinations API를 호출해 이미지를 생성하고 base64로 인코딩된 이미지를 반환합니다. 프론트엔드는 이를 받아 카드 UI에 렌더링합니다.
 
 두 저장소는 독립적으로 배포되며, 프론트엔드 API 클라이언트의 base URL을 이 백엔드의 배포 도메인으로 설정해 연동합니다.
 
@@ -137,3 +134,4 @@ CORS: `OPTIONS` 프리플라이트를 지원하며, `Access-Control-Allow-Origin
 - [ ] **프로덕션 미배포**: 아직 Vercel 프로덕션 배포 및 환경변수 등록이 완료되지 않았습니다.
 - [ ] 요청 rate limiting / 어뷰징 방지 로직 없음.
 - [ ] 프론트엔드와 에러 응답 스펙 최종 합의 필요.
+- [ ] Pollinations.ai는 무료지만 SLA/가동률 보장이 없는 서드파티 서비스입니다. 장애/속도 이슈 시 대체 이미지 생성 API 검토 필요.
