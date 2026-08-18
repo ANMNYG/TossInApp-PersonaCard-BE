@@ -19,10 +19,10 @@ const POLLINATIONS_IMAGE_URL = "https://image.pollinations.ai/prompt";
 const POLLINATIONS_TIMEOUT_MS = 45_000;
 
 const ELEMENT_STYLE: Record<Element, string> = {
-  fire: "blazing fire element, embers, flame aura, molten energy",
-  water: "flowing water element, mist, waves, glowing liquid energy",
-  earth: "sturdy earth element, stone, crystals, mossy natural energy",
-  air: "swirling air element, wind currents, feathers, light airy energy",
+  fire: "a flat angular flame-shaped icon made of solid triangular shards, geometric ember pattern",
+  water: "a flat teardrop or wave icon made of layered solid geometric shapes, angular ripple pattern",
+  earth: "a flat diamond or crystal-outline icon made of solid angular polygon shapes, geometric mountain pattern",
+  air: "a flat spiral wind icon made of solid angular swirl shapes, geometric feather pattern",
 };
 
 function isValidHexColor(value: unknown): value is string {
@@ -65,11 +65,11 @@ function validateBody(body: unknown): { ok: true; data: GenerateCardRequestBody 
 
 function buildPrompt({ element, personaTitle, colorPrimary, colorSecondary }: GenerateCardRequestBody): string {
   return [
-    `A fantasy trading card illustration for a character named "${personaTitle}".`,
+    `A minimalist geometric emblem card representing a persona titled "${personaTitle}", expressed purely through abstract symbolic shapes (diamonds, stars, polygons, geometric patterns) — not a person or creature.`,
     `Element: ${element} — ${ELEMENT_STYLE[element]}.`,
-    `Primary color: ${colorPrimary}, secondary color: ${colorSecondary}. Use these two colors prominently in the character's outfit, aura, and background lighting.`,
-    "Style: highly detailed digital fantasy card art, dramatic lighting, portrait composition, vibrant colors, ornate card border, semi-realistic painterly style.",
-    "No text, no watermark, no logo in the image.",
+    `Primary color: ${colorPrimary}, secondary color: ${colorSecondary}. Use these two colors as flat color fills and accent shapes.`,
+    "Style: minimalist geometric illustration, flat design, abstract symbolic shapes, modern app icon style, clean vector art, solid flat colors, dark navy background with gold accent, thin geometric card border.",
+    "No human figures, no people, no faces, no characters, no realistic or painterly rendering, no gradients, no gloss or glass material, no 3D shading or lighting effects. No text, no watermark, no logo in the image.",
   ].join(" ");
 }
 
