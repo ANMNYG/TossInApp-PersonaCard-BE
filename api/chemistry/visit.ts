@@ -6,6 +6,7 @@ import { calculateCompatibility } from "../../lib/compatibility";
 interface VisitRequestBody {
   sharerCode: string;
   visitorType: string;
+  nickname: string | null;
 }
 
 function validateBody(
@@ -15,7 +16,7 @@ function validateBody(
     return { ok: false, error: "요청 본문이 올바른 JSON 객체가 아닙니다." };
   }
 
-  const { sharerCode, visitorType } = body as Record<string, unknown>;
+  const { sharerCode, visitorType, nickname } = body as Record<string, unknown>;
 
   if (typeof sharerCode !== "string" || sharerCode.trim().length === 0) {
     return { ok: false, error: "sharerCode는 필수 문자열입니다." };
@@ -25,7 +26,18 @@ function validateBody(
     return { ok: false, error: "visitorType은 1~80자의 문자열이어야 합니다." };
   }
 
-  return { ok: true, data: { sharerCode: sharerCode.trim(), visitorType: visitorType.trim() } };
+  let trimmedNickname: string | null = null;
+  if (nickname !== undefined && nickname !== null) {
+    if (typeof nickname !== "string" || nickname.trim().length > 10) {
+      return { ok: false, error: "nickname은 최대 10자의 문자열이어야 합니다." };
+    }
+    trimmedNickname = nickname.trim().length === 0 ? null : nickname.trim();
+  }
+
+  return {
+    ok: true,
+    data: { sharerCode: sharerCode.trim(), visitorType: visitorType.trim(), nickname: trimmedNickname },
+  };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -58,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     throw err;
   }
 
-  const { sharerCode, visitorType } = validation.data;
+  const { sharerCode, visitorType, nickname } = validation.data;
 
   const { data: sharer, error: sharerError } = await supabase
     .from("sharers")
@@ -83,6 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sharer_code: sharerCode,
     sharer_type: sharerType,
     visitor_type: visitorType,
+    visitor_nickname: nickname,
   });
 
   if (insertError) {
