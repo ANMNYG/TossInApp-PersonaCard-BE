@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { setCorsHeaders } from "../../lib/cors";
 import { getSupabaseClient, SupabaseConfigError } from "../../lib/supabase";
 import { calculateCompatibility } from "../../lib/compatibility";
+import { maskNickname } from "../../lib/nickname";
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   setCorsHeaders(res, "GET, OPTIONS");
@@ -56,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const { data: visits, error: visitsError } = await supabase
     .from("visits")
-    .select("visitor_type, created_at")
+    .select("visitor_type, visitor_nickname, created_at")
     .eq("sharer_code", sharerCode)
     .order("created_at", { ascending: false });
 
@@ -68,8 +69,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const visitors = (visits ?? []).map((visit) => {
     const visitorType = visit.visitor_type as string;
+    const visitorNickname = visit.visitor_nickname as string | null;
     return {
       visitorType,
+      nickname: visitorNickname ? maskNickname(visitorNickname) : null,
       visitedAt: visit.created_at as string,
       compatibility: calculateCompatibility(sharerType, visitorType),
     };
