@@ -38,7 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const { data: sharer, error: sharerError } = await supabase
     .from("sharers")
-    .select("type")
+    .select("type, nickname")
     .eq("code", sharerCode)
     .maybeSingle();
 
@@ -54,6 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const sharerType = sharer.type as string;
+  const sharerNickname = sharer.nickname as string | null;
 
   const { data: visits, error: visitsError } = await supabase
     .from("visits")
@@ -81,6 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   res.status(200).json({
     sharerCode,
     sharerType,
+    sharerNickname: sharerNickname ? maskNickname(sharerNickname) : null,
     visitorCount: visitors.length,
     visitors,
   });
