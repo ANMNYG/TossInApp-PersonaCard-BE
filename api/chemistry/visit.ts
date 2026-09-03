@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { setCorsHeaders } from "../../lib/cors";
 import { getSupabaseClient, SupabaseConfigError } from "../../lib/supabase";
 import { calculateCompatibility } from "../../lib/compatibility";
+import { maskNickname } from "../../lib/nickname";
 
 interface VisitRequestBody {
   sharerCode: string;
@@ -74,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const { data: sharer, error: sharerError } = await supabase
     .from("sharers")
-    .select("type")
+    .select("type, nickname")
     .eq("code", sharerCode)
     .maybeSingle();
 
@@ -90,6 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const sharerType = sharer.type as string;
+  const sharerNickname = sharer.nickname as string | null;
 
   const { error: insertError } = await supabase.from("visits").insert({
     sharer_code: sharerCode,
@@ -110,6 +112,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sharerCode,
     sharerType,
     visitorType,
+    sharerNickname: sharerNickname ? maskNickname(sharerNickname) : null,
     compatibility,
   });
 }
