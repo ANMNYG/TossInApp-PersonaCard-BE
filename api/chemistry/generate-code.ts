@@ -5,6 +5,7 @@ import { getSupabaseClient, SupabaseConfigError } from "../../lib/supabase";
 
 interface GenerateCodeRequestBody {
   sharerType: string;
+  nickname: string | null;
 }
 
 // 혼동되기 쉬운 0/O, 1/I/L을 제외한 6자리 코드 (공유 링크에 넣기 좋은 형태)
@@ -22,13 +23,21 @@ function validateBody(
     return { ok: false, error: "요청 본문이 올바른 JSON 객체가 아닙니다." };
   }
 
-  const { sharerType } = body as Record<string, unknown>;
+  const { sharerType, nickname } = body as Record<string, unknown>;
 
   if (typeof sharerType !== "string" || sharerType.trim().length === 0 || sharerType.length > 80) {
     return { ok: false, error: "sharerType은 1~80자의 문자열이어야 합니다." };
   }
 
-  return { ok: true, data: { sharerType: sharerType.trim() } };
+  let trimmedNickname: string | null = null;
+  if (nickname !== undefined && nickname !== null) {
+    if (typeof nickname !== "string" || nickname.trim().length > 10) {
+      return { ok: false, error: "nickname은 최대 10자의 문자열이어야 합니다." };
+    }
+    trimmedNickname = nickname.trim().length === 0 ? null : nickname.trim();
+  }
+
+  return { ok: true, data: { sharerType: sharerType.trim(), nickname: trimmedNickname } };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -61,11 +70,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     throw err;
   }
 
-  const { sharerType } = validation.data;
+  const { sharerType, nickname } = validation.data;
 
   for (let attempt = 0; attempt < MAX_GENERATE_ATTEMPTS; attempt += 1) {
     const sharerCode = generateCode();
-    const { error } = await supabase.from("sharers").insert({ code: sharerCode, type: sharerType });
+    const { error } = await supabase
+      .from("sharers")
+      .insert({ code: sharerCode, type: sharerType, nickname });
 
     if (!error) {
       res.status(200).json({ sharerCode, sharerType });
