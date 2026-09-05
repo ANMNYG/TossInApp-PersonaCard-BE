@@ -147,6 +147,24 @@ CORS: `OPTIONS` 프리플라이트를 지원하며, `Access-Control-Allow-Origin
 
 에러 응답 형식은 공통으로 `{ "error": string }` 입니다. CORS는 `/api/generate-card`와 동일하게 `ALLOWED_ORIGIN` 환경변수를 사용합니다.
 
+### `GET /api/stats/visitor-count`
+
+지금까지 카드를 생성한 실제 방문자 수를 반환합니다. `sharers`(최초 공유자) row 수와 `visits`(방문 후 자기 카드를 완성한 방문자) row 수를 합산한 값입니다. 캐싱 없이 매 요청마다 실시간 집계합니다.
+
+**응답 (200 OK)**
+
+```json
+{ "count": 12384 }
+```
+
+**에러 응답**
+
+| 상태 코드 | 상황 |
+| --- | --- |
+| 405 | GET/OPTIONS 이외의 메서드 |
+| 500 | Supabase 환경변수 미설정 등 서버 설정 오류 |
+| 502 | Supabase 연결/쿼리 실패 |
+
 ### 닉네임 마스킹 (`lib/nickname.ts`)
 
 공유자/방문자 닉네임은 DB에는 **원본 그대로 저장**하고, 조회 응답(`sharerNickname`, `visitors[].nickname`)에서만 `maskNickname()`으로 마스킹해서 내보냅니다.
@@ -171,10 +189,12 @@ CORS: `OPTIONS` 프리플라이트를 지원하며, `Access-Control-Allow-Origin
 .
 ├── api/
 │   ├── generate-card.ts             # 카드 이미지 생성 API 핸들러 (요청 검증, 프롬프트 구성, Pollinations 호출)
-│   └── chemistry/
-│       ├── generate-code.ts         # 공유 코드 발급 (+ 공유자 닉네임 저장)
-│       ├── visit.ts                 # 방문 기록 저장 (+ 방문자 닉네임) + 궁합 계산 + sharerNickname 반환
-│       └── my-visitors.ts           # 방문자 목록 + 궁합 조회 (sharerNickname / visitor nickname 마스킹)
+│   ├── chemistry/
+│   │   ├── generate-code.ts         # 공유 코드 발급 (+ 공유자 닉네임 저장)
+│   │   ├── visit.ts                 # 방문 기록 저장 (+ 방문자 닉네임) + 궁합 계산 + sharerNickname 반환
+│   │   └── my-visitors.ts           # 방문자 목록 + 궁합 조회 (sharerNickname / visitor nickname 마스킹)
+│   └── stats/
+│       └── visitor-count.ts         # 카드 생성(sharers + visits) 총 방문자 수 카운터
 ├── lib/
 │   ├── compatibility.ts             # 원소 기반 궁합 점수/설명 계산 로직
 │   ├── cors.ts                      # 공통 CORS 헤더 설정
@@ -322,6 +342,10 @@ curl -s -X POST http://localhost:3000/api/chemistry/generate-code \
   -H "Content-Type: application/json" \
   -d '{"sharerType": "fire-water", "nickname": "12345678901"}'
 # => {"error":"nickname은 최대 10자의 문자열이어야 합니다."}
+
+# 6. 전체 방문자(카드 생성) 수 조회
+curl -s "http://localhost:3000/api/stats/visitor-count"
+# => {"count":2}
 ```
 
 ## 트러블슈팅
